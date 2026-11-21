@@ -1,0 +1,12 @@
+{
+  "name": "值勤打卡",
+  "short_name": "值勤打卡",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EEF2F0",
+  "theme_color": "#1D6B58",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1D6B58">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="值勤打卡">
+<title>值勤打卡</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root{
+    --bg:#EEF2F0; --card:#FFFFFF; --ink:#15221E; --muted:#5A6A65; --line:#D3DCD8; --sunk:#E3E9E6;
+    --accent:#1D6B58; --accent-ink:#FFFFFF; --dark:#15221E; --dark-ink:#FFFFFF;
+    --ok:#2C7A4B; --ok-soft:#DCF0E3; --bad:#B0281F; --bad-soft:#F7DEDB; --warn:#9A5B00; --warn-soft:#F8E9CF;
+  }
+  @media (prefers-color-scheme: dark){:root{
+    --bg:#0E1412; --card:#16201C; --ink:#E4EDE9; --muted:#93A49E; --line:#2A3833; --sunk:#1D2925;
+    --accent:#4DB596; --accent-ink:#06211A; --dark:#E4EDE9; --dark-ink:#0E1412;
+    --ok:#5BC488; --ok-soft:#173326; --bad:#F07870; --bad-soft:#3D1D1A; --warn:#E2A644; --warn-soft:#3A2C12; color-scheme:dark}}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;font-size:16px;line-height:1.5;
+    padding:env(safe-area-inset-top,0) max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0) max(16px,env(safe-area-inset-left,0px))}
+  .wrap{max-width:460px;margin:0 auto;padding-block:16px 40px;display:flex;flex-direction:column;gap:14px}
+  button,input{font:inherit;color:inherit}
+  button{cursor:pointer}
+  :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  .mono{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-variant-numeric:tabular-nums}
+
+  .top{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+  .org{font-weight:700;font-size:17px}
+  .date{color:var(--muted);font-size:13px}
+  .clock{font-size:34px;font-weight:600;line-height:1}
+  .net{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--ok-soft);color:var(--ok);white-space:nowrap}
+  .net.off{background:var(--bad-soft);color:var(--bad)}
+
+  .tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--sunk);padding:4px;border-radius:12px;gap:4px}
+  .tabs button{border:0;background:none;padding:10px 0;border-radius:9px;font-weight:700;color:var(--muted)}
+  .tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:999px;background:var(--warn);color:#fff;font-size:12px;line-height:20px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px}
+  label{font-size:13px;color:var(--muted);font-weight:500}
+  .roles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .roles button{padding:10px 0;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-weight:500}
+  .roles button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  input{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:18px}
+  .status{font-size:14px;color:var(--muted)}
+
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .big{padding:22px 0;border:0;border-radius:14px;font-size:22px;font-weight:700;width:100%}
+  .in{background:var(--accent);color:var(--accent-ink)}
+  .out{background:var(--dark);color:var(--dark-ink)}
+  .big:disabled{opacity:.45}
+
+  .res{border-radius:14px;padding:16px;text-align:center;display:flex;flex-direction:column;gap:4px}
+  .res.ok{background:var(--ok-soft);color:var(--ok)}
+  .res.bad{background:var(--bad-soft);color:var(--bad)}
+  .res.wait{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+  .res.warn{background:var(--warn-soft);color:var(--warn)}
+  .res b{font-size:19px}
+  .res .tm{font-size:42px;font-weight:600;line-height:1.1}
+
+  .cam{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:1/1;max-width:100%}
+  .cam video{width:100%;height:100%;object-fit:cover;display:block}
+  .cam .frame{position:absolute;inset:18%;border:3px solid rgba(255,255,255,.85);border-radius:16px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+  .cam .tip{position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#fff;font-size:14px}
+
+  .log{display:flex;flex-direction:column}
+  .log .it{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+  .log .it:last-child{border-bottom:0}
+  .log .t{color:var(--muted);font-size:14px}
+  .log .n{font-weight:500;min-width:0;overflow-wrap:anywhere}
+  .pill{font-size:12px;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .p-ok{background:var(--ok-soft);color:var(--ok)}
+  .p-wait{background:var(--warn-soft);color:var(--warn)}
+  .p-bad{background:var(--bad-soft);color:var(--bad)}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:var(--card);padding:7px 12px;border-radius:9px;font-size:14px;font-weight:500}
+  .help{font-size:13px;color:var(--muted)}
+  .help ol{margin:6px 0 0;padding-left:20px}
+  .setup{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:12px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <div class="org" id="org">值勤打卡</div>
+      <div class="date" id="date"></div>
+    </div>
+    <div style="text-align:right">
+      <div class="clock mono" id="clock">--:--</div>
+      <span class="net" id="net">有網路</span>
+    </div>
+  </div>
+
+  <div class="setup" id="setupMsg" hidden>尚未設定 Apps Script 網址。請在 GitHub 編輯 <b>config.js</b>，貼上你的網頁應用程式網址。</div>
+
+  <div class="card">
+    <div>
+      <label>職別</label>
+      <div class="roles" id="roles">
+        <button type="button" data-role="保全員" aria-pressed="false">保全員</button>
+        <button type="button" data-role="清潔" aria-pressed="false">清潔</button>
+        <button type="button" data-role="總幹事" aria-pressed="false">總幹事</button>
+      </div>
+    </div>
+    <div>
+      <label for="name">姓名</label>
+      <input id="name" maxlength="20" autocomplete="name" placeholder="請輸入你的姓名">
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabClock" aria-selected="true">上下班</button>
+    <button role="tab" id="tabPatrol" aria-selected="false">巡邏<span class="badge" id="badge" hidden>0</span></button>
+  </div>
+
+  <!-- 上下班 -->
+  <section id="viewClock" class="card" style="background:none;border:0;padding:0">
+    <div class="status" id="status">這支手機會記住你的職別和姓名，下次不用再填。</div>
+    <div class="btns">
+      <button class="big in" id="btnIn">上班</button>
+      <button class="big out" id="btnOut">下班</button>
+    </div>
+    <div id="clockRes" hidden></div>
+    <div class="help" id="geoHelp" hidden>
+      <b>無法取得定位時：</b>
+      <ol>
+        <li>從 LINE 打開的話，請按右上角「⋯」選「用預設瀏覽器開啟」。</li>
+        <li>iPhone：設定 → 隱私權與安全性 → 定位服務 → 開啟，Safari 設為「使用 App 期間」。</li>
+        <li>Android：打開手機的「定位」，並在 Chrome 允許這個網站使用位置資訊。</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 巡邏 -->
+  <section id="viewPatrol" hidden style="display:flex;flex-direction:column;gap:14px">
+    <button class="big in" id="btnScan">掃描巡邏點 QR Code</button>
+    <div class="cam" id="cam" hidden>
+      <video id="video" playsinline muted></video>
+      <div class="frame"></div>
+      <div class="tip">把 QR Code 對準框框</div>
+    </div>
+    <button class="btn" id="btnStop" hidden>關閉相機</button>
+    <div id="patrolRes" hidden></div>
+    <div class="card">
+      <div class="row"><b>今天的巡邏紀錄</b><button class="btn" id="btnSync">立即上傳</button></div>
+      <div class="status" id="syncMsg"></div>
+      <div class="log" id="log"></div>
+    </div>
+    <p class="help" style="margin:0">沒有網路也可以掃描，紀錄會先存在手機裡，有網路時自動上傳。上傳前請不要清除瀏覽器資料。</p>
+  </section>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+(function(){
+  var URL_OK = window.SCRIPT_URL && window.SCRIPT_URL.indexOf('/exec') > 0 && window.SCRIPT_URL.indexOf('請貼上') < 0;
+  var WK = ['日','一','二','三','四','五','六'];
+  var role = '', busy = false, syncing = false;
+  function $(id){ return document.getElementById(id); }
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function hm(ms){ var d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function get(k, def){ try { var v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch (e) { return def; } }
+  function put(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function todayKey(ms){ var d = new Date(ms || Date.now()); return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+  if (!URL_OK) $('setupMsg').hidden = false;
+
+  /* ---- 時鐘與網路狀態 ---- */
+  function tick(){
+    var d = new Date();
+    $('clock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    $('date').textContent = '民國' + (d.getFullYear()-1911) + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日 星期' + WK[d.getDay()];
+  }
+  setInterval(tick, 1000); tick();
+  function net(){ var on = navigator.onLine; $('net').textContent = on ? '有網路' : '離線中'; $('net').className = 'net' + (on ? '' : ' off'); }
+  window.addEventListener('online', function(){ net(); sync(); loadConfig(); });
+  window.addEventListener('offline', net); net();
+
+  /* ---- 與 Apps Script 溝通 ---- */
+  function post(body, ms){
+    var ctl = new AbortController(), t = setTimeout(function(){ ctl.abort(); }, ms || 20000);
+    return fetch(window.SCRIPT_URL, { method: 'POST', body: JSON.stringify(body), signal: ctl.signal })
+      .then(function(r){ return r.json(); })
+      .finally(function(){ clearTimeout(t); });
+  }
+  function loadConfig(){
+    if (!URL_OK || !navigator.onLine) return;
+    var ctl = new AbortController(), t = setTimeout(function(){ ctl.abort(); }, 12000);
+    fetch(window.SCRIPT_URL + '?action=config', { signal: ctl.signal })
+      .then(function(r){ return r.json(); })
+      .then(function(c){ if (c && c.ok){ put('tc_cfg', c); applyCfg(c); } })
+      .catch(function(){})
+      .finally(function(){ clearTimeout(t); });
+  }
+  function applyCfg(c){ if (c && c.org){ $('org').textContent = c.org; document.title = c.org + ' 值勤打卡'; } }
+  applyCfg(get('tc_cfg', null));
+
+  /* ---- 職別與姓名 ---- */
+  function setRole(r){
+    role = r;
+    document.querySelectorAll('#roles button').forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-role') === r ? 'true' : 'false'); });
+    put('tc_role', r); refreshStatus();
+  }
+  document.querySelectorAll('#roles button').forEach(function(b){ b.onclick = function(){ setRole(b.getAttribute('data-role')); }; });
+  var nameT;
+  $('name').addEventListener('input', function(){ put('tc_name', $('name').value.trim()); clearTimeout(nameT); nameT = setTimeout(refreshStatus, 800); });
+  function who(){
+    var name = $('name').value.trim();
+    if (!role) return { err: '請先選擇職別' };
+    if (!name) return { err: '請輸入姓名' };
+    return { name: name };
+  }
+
+  /* ---- 分頁 ---- */
+  function tab(p){
+    $('tabClock').setAttribute('aria-selected', p ? 'false' : 'true');
+    $('tabPatrol').setAttribute('aria-selected', p ? 'true' : 'false');
+    $('viewClock').hidden = !!p; $('viewPatrol').hidden = !p;
+    if (!p) stopCam();
+    put('tc_tab', p ? 'patrol' : 'clock');
+  }
+  $('tabClock').onclick = function(){ tab(false); };
+  $('tabPatrol').onclick = function(){ tab(true); };
+
+  function show(el, cls, html){ var r = $(el); r.className = 'res ' + cls; r.innerHTML = html; r.hidden = false; }
+
+  /* ---- 定位 ---- */
+  function locate(opts){
+    return new Promise(function(res, rej){
+      if (!navigator.geolocation) return rej({ code: 0 });
+      navigator.geolocation.getCurrentPosition(function(p){ res({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }); }, rej, opts);
+    });
+  }
+
+  /* ---- 上下班打卡（需要網路） ---- */
+  function refreshStatus(){
+    var w = who(); if (w.err || !URL_OK || !navigator.onLine) return;
+    $('status').textContent = '查詢打卡狀態中…';
+    post({ action: 'status', role: role, name: w.name }, 12000).then(function(r){
+      $('status').textContent = r && r.open ? '你在 ' + r.open.date + ' ' + r.open.time + ' 已上班，下班記得打卡。' : '目前沒有未下班的紀錄。';
+    }).catch(function(){ $('status').textContent = ''; });
+  }
+  function lockBtns(on){ busy = on; $('btnIn').disabled = on; $('btnOut').disabled = on; }
+  function punch(kind){
+    if (busy) return;
+    var w = who(); if (w.err) return show('clockRes', 'bad', '<b>' + w.err + '</b>');
+    if (!URL_OK) return show('clockRes', 'bad', '<b>系統尚未設定完成</b><span>請通知總幹事。</span>');
+    if (!navigator.onLine) return show('clockRes', 'bad', '<b>目前沒有網路</b><span>上下班打卡需要網路，請到收訊好的地方再試。</span>');
+    lockBtns(true); $('geoHelp').hidden = true;
+    show('clockRes', 'wait', '<b>正在取得定位…</b><span>第一次會詢問是否允許定位，請按「允許」。</span>');
+    locate({ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }).then(function(pos){
+      show('clockRes', 'wait', '<b>定位完成，打卡中…</b>');
+      return post({ action: 'punch', role: role, name: w.name, kind: kind, lat: pos.lat, lng: pos.lng, acc: pos.acc }).then(function(r){
+        if (!r || !r.ok) return show('clockRes', 'bad', '<b>打卡失敗</b><span>' + esc(r ? r.msg : '請再試一次') + '</span>');
+        show('clockRes', 'ok', '<b>' + (r.kind === 'in' ? '上班打卡完成' : '下班打卡完成') + '</b>' +
+          '<div class="tm mono">' + esc(r.time) + '</div><span>' + esc(r.name) + '　距離社區 ' + r.dist + ' 公尺</span>' +
+          (r.hours !== undefined ? '<span>本次工時 ' + Number(r.hours).toFixed(2) + ' 小時</span>' : '') +
+          (r.warn ? '<span style="color:var(--warn)">' + esc(r.warn) + '</span>' : ''));
+        refreshStatus();
+      }, function(){ show('clockRes', 'bad', '<b>連線失敗</b><span>網路不穩，請稍後再試一次。</span>'); });
+    }, function(err){
+      var msg = err.code === 1 ? '你沒有允許定位，無法打卡。' : err.code === 3 ? '定位逾時，請到窗邊或戶外再試一次。' : '目前無法取得定位。';
+      show('clockRes', 'bad', '<b>無法取得定位</b><span>' + msg + '</span>'); $('geoHelp').hidden = false;
+    }).finally(function(){ lockBtns(false); });
+  }
+  $('btnIn').onclick = function(){ punch('in'); };
+  $('btnOut').onclick = function(){ punch('out'); };
+
+  /* ---- 巡邏：紀錄存在手機，之後補傳 ---- */
+  // tc_queue: 待上傳；tc_log: 今天的顯示紀錄
+  function pointName(code){
+    var cfg = get('tc_cfg', null);
+    if (!cfg || !cfg.points || !window.crypto || !crypto.subtle) return Promise.resolve(null);
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(code)).then(function(buf){
+      var h = Array.prototype.map.call(new Uint8Array(buf), function(b){ return (b < 16 ? '0' : '') + b.toString(16); }).join('').slice(0, 16);
+      for (var i = 0; i < cfg.points.length; i++) if (cfg.points[i].h === h) return cfg.points[i].name;
+      return null;
+    }).catch(function(){ return null; });
+  }
+  function codeFrom(text){
+    var m = String(text).match(/[#&?]p=([A-Za-z0-9]{4,40})/);
+    if (m) return m[1];
+    return /^[A-Za-z0-9]{4,40}$/.test(text) ? text : null;
+  }
+  function renderLog(){
+    var log = get('tc_log', []).filter(function(x){ return todayKey(x.at) === todayKey(); });
+    put('tc_log', log);
+    var q = get('tc_queue', []);
+    $('badge').textContent = q.length; $('badge').hidden = !q.length;
+    $('log').innerHTML = log.length ? log.slice().reverse().map(function(x){
+      var st = x.bad ? '<span class="pill p-bad">QR 無效</span>' : x.up ? '<span class="pill p-ok">已上傳</span>' : '<span class="pill p-wait">待上傳</span>';
+      return '<div class="it"><span class="t mono">' + hm(x.at) + '</span><span class="n">' + esc(x.name || '巡邏點') + (x.geo ? '' : ' <span class="t">· 無定位</span>') + '</span>' + st + '</div>';
+    }).join('') : '<div class="status">今天還沒有巡邏紀錄。</div>';
+    $('syncMsg').textContent = q.length ? '有 ' + q.length + ' 筆等待上傳' + (navigator.onLine ? '' : '（目前離線，有網路時會自動上傳）') : (log.length ? '全部已上傳' : '');
+  }
+
+  var lastCode = '', lastAt = 0, recording = false;
+  function recordScan(code){
+    var w = who();
+    if (w.err){ tab(true); show('patrolRes', 'bad', '<b>' + w.err + '</b><span>填好後再掃一次。</span>'); return; }
+    if (recording) return;
+    if (code === lastCode && Date.now() - lastAt < 60000){ show('patrolRes', 'warn', '<b>這個點剛剛已經掃過了</b>'); return; }
+    recording = true; lastCode = code; lastAt = Date.now();
+    var at = Date.now(), id = at.toString(36) + Math.random().toString(36).slice(2, 8);
+    if (navigator.vibrate) navigator.vibrate(80);
+    show('patrolRes', 'wait', '<b>已讀到 QR Code，定位中…</b><span>收不到定位也會照常記錄。</span>');
+    pointName(code).then(function(name){
+      return locate({ enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }).catch(function(){ return null; }).then(function(pos){
+        var cfg = get('tc_cfg', null), known = !!name, bad = cfg && cfg.points && !known;
+        var scan = { id: id, code: code, at: at };
+        if (pos){ scan.lat = pos.lat; scan.lng = pos.lng; scan.acc = pos.acc; }
+        var q = get('tc_queue', []); q.push(scan); put('tc_queue', q);
+        var log = get('tc_log', []); log.push({ id: id, at: at, name: name, geo: !!pos, up: false, bad: bad }); put('tc_log', log);
+        if (bad) show('patrolRes', 'bad', '<b>不認得這個 QR Code</b><span>已先記錄，請確認是不是社區的巡邏點。</span>');
+        else show('patrolRes', 'ok', '<b>巡邏打卡完成</b><div class="tm mono">' + hm(at) + '</div><span>' + esc(name || '巡邏點') + '</span>' +
+          (navigator.onLine ? '' : '<span>目前離線，有網路時會自動上傳</span>'));
+        renderLog(); sync();
+      });
+    }).finally(function(){ recording = false; });
+  }
+
+  function sync(){
+    if (syncing || !URL_OK || !navigator.onLine) return;
+    var q = get('tc_queue', []); if (!q.length) return;
+    var w = who(); if (w.err) return;
+    syncing = true; $('syncMsg').textContent = '上傳中…';
+    post({ action: 'patrol', role: role, name: w.name, scans: q.slice(0, 50) }, 25000).then(function(r){
+      if (!r || !r.ok) throw r;
+      var ok = {}; (r.accepted || []).forEach(function(i){ ok[i] = 1; });
+      put('tc_queue', get('tc_queue', []).filter(function(s){ return !ok[s.id]; }));
+      put('tc_log', get('tc_log', []).map(function(x){ if (ok[x.id]) x.up = true; return x; }));
+    }).catch(function(){}).finally(function(){
+      syncing = false; renderLog();
+      if (get('tc_queue', []).length && navigator.onLine) setTimeout(sync, 15000);
+    });
+  }
+  $('btnSync').onclick = function(){ if (!navigator.onLine){ $('syncMsg').textContent = '目前沒有網路，有網路時會自動上傳。'; return; } sync(); };
+  setInterval(sync, 30000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden){ sync(); renderLog(); } });
+
+  /* ---- 相機掃描 ---- */
+  var stream = null, raf = 0, canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
+  function stopCam(){
+    cancelAnimationFrame(raf);
+    if (stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+    $('cam').hidden = true; $('btnStop').hidden = true; $('btnScan').hidden = false;
+  }
+  function startCam(){
+    var w = who(); if (w.err) return show('patrolRes', 'bad', '<b>' + w.err + '</b>');
+    if (!window.jsQR) return show('patrolRes', 'bad', '<b>掃描功能還沒載入</b><span>請在有網路的地方重新打開一次這個頁面。</span>');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return show('patrolRes', 'bad', '<b>這個瀏覽器不能使用相機</b><span>請改用 Safari 或 Chrome 打開。</span>');
+    $('patrolRes').hidden = true;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(function(s){
+      stream = s; var v = $('video'); v.srcObject = s; v.play();
+      $('cam').hidden = false; $('btnStop').hidden = false; $('btnScan').hidden = true;
+      loop();
+    }).catch(function(){
+      show('patrolRes', 'bad', '<b>無法開啟相機</b><span>請允許這個網站使用相機。也可以直接用手機相機或 LINE 掃描 QR Code。</span>');
+    });
+  }
+  function loop(){
+    var v = $('video');
+    if (stream && v.readyState >= 2 && v.videoWidth){
+      var s = Math.min(640, v.videoWidth), h = Math.round(v.videoHeight * s / v.videoWidth);
+      canvas.width = s; canvas.height = h; ctx.drawImage(v, 0, 0, s, h);
+      var img = ctx.getImageData(0, 0, s, h), r = window.jsQR(img.data, s, h, { inversionAttempts: 'dontInvert' });
+      if (r && r.data){
+        var code = codeFrom(r.data);
+        if (code){ stopCam(); recordScan(code); return; }
+      }
+    }
+    raf = requestAnimationFrame(loop);
+  }
+  $('btnScan').onclick = startCam;
+  $('btnStop').onclick = stopCam;
+
+  /* ---- 啟動 ---- */
+  var n = get('tc_name', ''); if (n) $('name').value = n;
+  var r0 = get('tc_role', ''); if (r0) setRole(r0);
+  tab(get('tc_tab', 'clock') === 'patrol');
+  renderLog(); loadConfig(); sync();
+
+  // 用手機相機或 LINE 掃 QR Code 進來（網址帶 #p=代碼）
+  var hc = codeFrom(location.hash);
+  if (hc){ history.replaceState(null, '', location.pathname + location.search); tab(true); recordScan(hc); }
+  window.addEventListener('hashchange', function(){
+    var c = codeFrom(location.hash);
+    if (c){ history.replaceState(null, '', location.pathname + location.search); tab(true); recordScan(c); }
+  });
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
+})();
+</script>
+</body>
+</html>
