@@ -1,5 +1,5 @@
 // 讓打卡頁面沒有網路也能打開。修改網頁後，把版本號 v1 改成 v2、v3… 讓手機更新。
-const CACHE = 'clockin-v1';
+const CACHE = 'clockin-v2';
 const ASSETS = [
   './',
   './index.html',
