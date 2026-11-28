@@ -71,6 +71,11 @@
   .cam video{width:100%;height:100%;object-fit:cover;display:block}
   .cam .frame{position:absolute;inset:18%;border:3px solid rgba(255,255,255,.85);border-radius:16px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
   .cam .tip{position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#fff;font-size:14px}
+  .torch{position:absolute;top:10px;right:10px;display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;border:0;
+    background:rgba(0,0,0,.55);color:#fff;font-size:15px;font-weight:700}
+  .torch svg{width:18px;height:18px}
+  .torch[aria-pressed="true"]{background:#FFD84D;color:#1A1A1A}
+  .torchNote{font-size:13px;color:var(--muted);margin:0}
 
   .log{display:flex;flex-direction:column}
   .log .it{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
@@ -151,7 +156,12 @@
       <video id="video" playsinline muted></video>
       <div class="frame"></div>
       <div class="tip" data-t="camTip">把 QR Code 對準框框</div>
+      <button class="torch" id="btnTorch" type="button" aria-pressed="false" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2h10v4l-3 4v12h-4V10L7 6z"/><path d="M12 13v2"/></svg>
+        <span id="torchLabel"></span>
+      </button>
     </div>
+    <p class="torchNote" id="torchNote" hidden></p>
     <button class="btn" id="btnStop" data-t="stopCam" hidden>關閉相機</button>
     <div id="patrolRes" hidden></div>
     <div class="card">
@@ -180,6 +190,8 @@
       geo2:'iPhone：設定 → 隱私權與安全性 → 定位服務 → 開啟，Safari 設為「使用 App 期間」。',
       geo3:'Android：打開手機的「定位」，並在 Chrome 允許這個網站使用位置資訊。',
       scan:'掃描巡邏點 QR Code', camTip:'把 QR Code 對準框框', stopCam:'關閉相機',
+      torchOn:'開燈', torchOff:'關燈',
+      torchNo:'這支手機不能在網頁裡開手電筒。iPhone 可以從「控制中心」開啟「掃描 QR Code」，畫面下方有手電筒按鈕，掃到後一樣會記錄。',
       todayLog:'今天的巡邏紀錄', syncNow:'立即上傳',
       offlineNote:'沒有網路也可以掃描，紀錄會先存在手機裡，有網路時自動上傳。上傳前請不要清除瀏覽器資料。',
       checking:'查詢打卡狀態中…', openSince:'你在 {date} {time} 已上班，下班記得打卡。', noOpen:'目前沒有未下班的紀錄。',
@@ -214,6 +226,8 @@
       geo2:'iPhone: Settings → Privacy & Security → Location Services → on, and set Safari to "While Using the App".',
       geo3:'Android: turn on Location, then allow this site to use your location in Chrome.',
       scan:'Scan checkpoint QR code', camTip:'Fit the QR code inside the frame', stopCam:'Close camera',
+      torchOn:'Light on', torchOff:'Light off',
+      torchNo:'This phone can\'t turn on the flashlight from a web page. On iPhone, open "Code Scanner" from Control Center. It has a flashlight button, and the scan is recorded the same way.',
       todayLog:'Today\'s patrol log', syncNow:'Upload now',
       offlineNote:'You can scan without internet. Scans are saved on this phone and upload automatically when you\'re back online. Don\'t clear browser data before they upload.',
       checking:'Checking your status…', openSince:'You clocked in at {date} {time}. Remember to clock out.', noOpen:'You\'re not clocked in right now.',
@@ -266,7 +280,8 @@
     document.title = (cfg && cfg.org ? cfg.org + ' ' : '') + t('title');
     $('clockRes').hidden = true; $('patrolRes').hidden = true;
     $('status').textContent = t('remember');
-    net(); tick(); renderLog(); refreshStatus();
+    net(); tick(); renderLog(); refreshStatus(); drawTorch();
+    if (!$('torchNote').hidden) $('torchNote').textContent = t('torchNo');
   }
   $('btnLang').onclick = function(){ lang = lang === 'en' ? 'zh' : 'en'; put('tc_lang', lang); applyLang(); };
   if (!URL_OK) $('setupMsg').hidden = false;
@@ -449,10 +464,38 @@
 
   /* ---- 相機掃描 ---- */
   var stream = null, raf = 0, canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
+  /* 手電筒：Android Chrome 大多支援；iPhone 網頁多半不支援，改顯示替代做法 */
+  var torchOn = false;
+  function camTrack(){ return stream && stream.getVideoTracks()[0]; }
+  function drawTorch(){
+    $('btnTorch').setAttribute('aria-pressed', torchOn ? 'true' : 'false');
+    $('torchLabel').textContent = torchOn ? t('torchOff') : t('torchOn');
+  }
+  function setTorch(on){
+    var tr = camTrack(); if (!tr) return Promise.resolve(false);
+    return tr.applyConstraints({ advanced: [{ torch: on }] }).then(function(){
+      torchOn = on; put('tc_torch', on); drawTorch(); return true;
+    }, function(){ return false; });
+  }
+  function setupTorch(){
+    if (!stream) return;
+    var tr = camTrack(), caps = null;
+    try { caps = tr && tr.getCapabilities ? tr.getCapabilities() : null; } catch (e) {}
+    if (caps && caps.torch){
+      $('btnTorch').hidden = false; $('torchNote').hidden = true; drawTorch();
+      if (get('tc_torch', false)) setTorch(true);   // 上次有開燈，這次自動開
+    } else {
+      $('btnTorch').hidden = true; $('torchNote').textContent = t('torchNo'); $('torchNote').hidden = false;
+    }
+  }
+  $('btnTorch').onclick = function(){ setTorch(!torchOn); };
+
   function stopCam(){
     cancelAnimationFrame(raf);
     if (stream){ stream.getTracks().forEach(function(tr){ tr.stop(); }); stream = null; }
+    torchOn = false;
     $('cam').hidden = true; $('btnStop').hidden = true; $('btnScan').hidden = false;
+    $('btnTorch').hidden = true; $('torchNote').hidden = true;
   }
   function startCam(){
     var w = who(); if (w.err) return show('patrolRes', 'bad', '<b>' + w.err + '</b>');
@@ -462,6 +505,7 @@
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(function(s){
       stream = s; var v = $('video'); v.srcObject = s; v.play();
       $('cam').hidden = false; $('btnStop').hidden = false; $('btnScan').hidden = true;
+      setTimeout(setupTorch, 600);   // 部分手機要等相機啟動後才回報是否有手電筒
       loop();
     }).catch(function(){
       show('patrolRes', 'bad', '<b>' + t('camFail') + '</b><span>' + t('camFail2') + '</span>');
